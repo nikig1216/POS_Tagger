@@ -5,13 +5,16 @@
 # Project 2: Independent POS Tagger
 
 from nltk.corpus import brown
+from nltk.corpus import treebank
 import math
 import os
 from nltk.tokenize import word_tokenize
 from nltk.tokenize import sent_tokenize
+from nltk.tokenize import TweetTokenizer
+import nltk.tag
 
-
-smoothingParam = 0
+tknzr = TweetTokenizer()
+smoothingParam = 0.01
 
 class tagset:
     def __init__(self):
@@ -88,7 +91,9 @@ class tagset:
                 self.word_probs[w].prob = math.log((self.word_probs[w].count + smoothingParam)/(self.WordsSeen + smoothingParam*self.word_probs.__len__()))
 
     def tag(self, sentence):
-        tagList = self.tags.keys()
+        tagList = list(self.tags.keys()) # Get a list of the tags for the end
+        # sentence = word_tokenize(sentence) # Turn sentence string into tokens
+        sentence = tknzr.tokenize(sentence)
 
         # Create Path Prob and BackPointer Matrices
         n = self.tags.__len__()
@@ -101,17 +106,18 @@ class tagset:
 
         # Initialization Step, Fill the First Column
         for counter, i in enumerate(self.tags):
-            viterbi[counter][0] = self.a('<s>', self.tags[i]) + self.b(self.tags[i], sentence[0]) # Add b/c Logs
+            # print(self.tags[i])
+            viterbi[counter][0] = self.a('<s>', i) + self.b(i, sentence[0]) # Add b/c Logs
             backpointer[counter][0] = None
 
         # Recursion Step, Fill the Rest of the Columns
-        for t in range(1,m-1):
+        for t in range(1,m): # Goes from 1 or Col2 TO m-1 or last column
             for counter, i in enumerate(self.tags):
                 the_max = float('-inf')
                 maxBackPoint = None
 
                 for arg_counter, arg_i in enumerate(self.tags):
-                    test = viterbi[arg_counter][t-1] + self.a(self.tags[arg_i], self.tags[i]) + self.b(self.tags[i], sentence[t])
+                    test = viterbi[arg_counter][t-1] + self.a(arg_i, i) + self.b(i, sentence[t])
                     if test > the_max:
                         the_max = test
                         maxBackPoint = arg_counter
@@ -120,7 +126,32 @@ class tagset:
                 backpointer[counter][t] = maxBackPoint
 
         # Termination Step
+        viterbi_final = float('-inf')
+        backpointer_final = None
 
+        for counter, i in enumerate(self.tags):
+            test = viterbi[counter][m-1] + self.a(i, '</s>')
+            if test > viterbi_final:
+                viterbi_final = test
+                backpointer_final = counter
+
+        output_tags = []
+        pointer = backpointer_final
+
+        # TheFinalTag
+        # print(tagList[pointer])
+        output_tags.append(tagList[pointer])
+
+        for tt in range(-1,-1*m-1,-1):
+            pointer = backpointer[pointer][tt] # pointer has old value that directs it to grab next pointer and assign to self
+            if tt == -1*m or pointer == None:
+                # print('tt: ', tt, ' ',tt == -1*m, ' and pointer: ', pointer)
+                print('Sentence Tagged.')
+            else:
+                output_tags.append(tagList[pointer])
+
+        output_tags.reverse()
+        return output_tags
 
     def a(self, prevTag, currentTag):
         if currentTag not in self.tags:
@@ -138,15 +169,17 @@ class tagset:
         else:
             return self.tags[currentTag].word_probs[currentWord].prob
 
-# Treat Unknown Probs during Viterbi Algo
-# Treat special case of prevTag= None for <s>, treat <s> and </s> as tokens also.
+# Main Program and UI
 
 print('Welcome to my POS Tagging Algorithm. Please wait while I learn some probabilities...')
 # testing = input('Enter: ')
 my_tagset = tagset()
 
 w = brown.tagged_sents()
-for p in w._pieces:
+
+for counter, p in enumerate(w._pieces):
+
+    print('Status: ', counter * 100 / w._pieces.__len__(), '%')
     for sent in p:
         # Sentence Starter
         my_tagset.updateTagset('<s>', '<s>', None)
@@ -167,9 +200,9 @@ for p in w._pieces:
 
 my_tagset.assignProbabilities()
 print('Done Training!')
-string_to_tag = input('Enter a sentence to tag: ')
+string_to_tag = input('Enter some sentence(s) to tag: ')
 sents_to_tag = sent_tokenize(string_to_tag)
 for sentence in sents_to_tag:
-    my_tagset.tag(sentence)
-
+    print('Program: ', my_tagset.tag(sentence))
+    print('NLTK Result: ', nltk.pos_tag(word_tokenize(sentence)))
 
