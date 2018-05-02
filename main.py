@@ -7,7 +7,6 @@
 from nltk.corpus import brown
 from nltk.corpus import treebank
 import math
-import os
 from nltk.tokenize import word_tokenize
 from nltk.tokenize import sent_tokenize
 from nltk.tokenize import TweetTokenizer
@@ -16,8 +15,13 @@ import nltk.tag
 tknzr = TweetTokenizer()
 smoothingParam = 0.01
 
+
 class tagset:
     def __init__(self):
+        """
+
+        :rtype: list
+        """
         self.tags = {}
 
     def updateTagset(self, tag, word, prevTag):
@@ -47,17 +51,17 @@ class tagset:
         def __init__(self, key):
             self.the_key = key
             self.tag_count = 1
-            self.unknownWordProbability = None # Prob for Unknown Word, Unseen TagTransition Prob will be 0.
-            self.WordsSeen = 0 # Number of Total Words Seen
-            self.TransitionsSeen = 0 # Number of Total Transitions Seen
-            self.word_probs = {} # Number of Unique Words, Counts and Probs
-            self.transition_probs = {} # Number of Unique Tag Transitions, Cs & Ps
+            self.unknownWordProbability = None  # Prob for Unknown Word, Unseen TagTransition Prob will be 0.
+            self.WordsSeen = 0  # Number of Total Words Seen
+            self.TransitionsSeen = 0  # Number of Total Transitions Seen
+            self.word_probs = {}  # Number of Unique Words, Counts and Probs
+            self.transition_probs = {}  # Number of Unique Tag Transitions, Cs & Ps
 
         def updateTagCounts(self, word, prevTag, isNew):
             if isNew == False:
                 self.tag_count += 1
             self.updateWordCount(word)
-            if prevTag != None:
+            if prevTag is not None:
                 self.updateTagTransitionCount(prevTag)
                 self.TransitionsSeen += 1
             self.WordsSeen += 1
@@ -83,7 +87,7 @@ class tagset:
 
         def assignWordProbabilities(self):
             if smoothingParam == 0:
-                self.unknownWordProbability = float('-inf') # Because log(0) is negative infinity
+                self.unknownWordProbability = float('-inf')  # Because log(0) is negative infinity
             else:
                 self.unknownWordProbability = math.log(smoothingParam/(self.WordsSeen + smoothingParam*self.word_probs.__len__()))
 
@@ -91,7 +95,7 @@ class tagset:
                 self.word_probs[w].prob = math.log((self.word_probs[w].count + smoothingParam)/(self.WordsSeen + smoothingParam*self.word_probs.__len__()))
 
     def tag(self, sentence):
-        tagList = list(self.tags.keys()) # Get a list of the tags for the end
+        tagList = list(self.tags.keys())  # Get a list of the tags for the end
         # sentence = word_tokenize(sentence) # Turn sentence string into tokens
         sentence = tknzr.tokenize(sentence)
 
@@ -107,7 +111,7 @@ class tagset:
         # Initialization Step, Fill the First Column
         for counter, i in enumerate(self.tags):
             # print(self.tags[i])
-            viterbi[counter][0] = self.a('<s>', i) + self.b(i, sentence[0]) # Add b/c Logs
+            viterbi[counter][0] = self.a('<s>', i) + self.b(i, sentence[0])  # Add b/c Logs
             backpointer[counter][0] = None
 
         # Recursion Step, Fill the Rest of the Columns
@@ -142,8 +146,8 @@ class tagset:
         # print(tagList[pointer])
         output_tags.append(tagList[pointer])
 
-        for tt in range(-1,-1*m-1,-1):
-            pointer = backpointer[pointer][tt] # pointer has old value that directs it to grab next pointer and assign to self
+        for tt in range(-1, -1*m-1, -1):
+            pointer = backpointer[pointer][tt]  # pointer has old value that directs it to grab next pointer and assign to self
             if tt == -1*m or pointer == None:
                 # print('tt: ', tt, ' ',tt == -1*m, ' and pointer: ', pointer)
                 print('Sentence Tagged.')
@@ -151,7 +155,11 @@ class tagset:
                 output_tags.append(tagList[pointer])
 
         output_tags.reverse()
-        return output_tags
+        the_output = []
+        for counter, a_tag in enumerate(output_tags):
+            pair = (sentence[counter], a_tag)
+            the_output.append(pair)
+        return the_output
 
     def a(self, prevTag, currentTag):
         if currentTag not in self.tags:
@@ -169,6 +177,7 @@ class tagset:
         else:
             return self.tags[currentTag].word_probs[currentWord].prob
 
+
 # Main Program and UI
 
 print('Welcome to my POS Tagging Algorithm. Please wait while I learn some probabilities...')
@@ -179,7 +188,8 @@ w = brown.tagged_sents()
 
 for counter, p in enumerate(w._pieces):
 
-    print('Status: ', counter * 100 / w._pieces.__len__(), '%')
+    if counter % 30 == 0:
+        print('Status: ', counter * 100 / w._pieces.__len__(), '%')
     for sent in p:
         # Sentence Starter
         my_tagset.updateTagset('<s>', '<s>', None)
@@ -196,13 +206,21 @@ for counter, p in enumerate(w._pieces):
         # End of Sentence
         my_tagset.updateTagset('</s>', '</s>', previous_tag)
 
-    # For Now to Test
 
 my_tagset.assignProbabilities()
 print('Done Training!')
-string_to_tag = input('Enter some sentence(s) to tag: ')
-sents_to_tag = sent_tokenize(string_to_tag)
-for sentence in sents_to_tag:
-    print('Program: ', my_tagset.tag(sentence))
-    print('NLTK Result: ', nltk.pos_tag(word_tokenize(sentence)))
+print('__________________________________')
+is_end = False
 
+while not is_end:
+    string_to_tag = input('Enter some sentence(s) to tag: ')
+    sents_to_tag = sent_tokenize(string_to_tag)
+    for sentence in sents_to_tag:
+        print('Program Result: ', my_tagset.tag(sentence))
+        print('NLTK\'s Result:  ', nltk.tag.pos_tag(word_tokenize(sentence)))
+        print('__________________________________')
+
+    end = input('Are you done? Hit [enter] for yes. Otherwise type anything else to start again.')
+
+    if end == '':
+        is_end = True
